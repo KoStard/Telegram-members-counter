@@ -55,7 +55,6 @@ html, body {
 #scroll-solver {
     position: absolute;
     overflow-x: scroll;
-    padding-bottom: 17px;
     top: 0;
     left: 0;
     right: 0;
@@ -84,4 +83,29 @@ html, body {
 
 .coordinates {
     stroke: white;
+}
+
+#info-panel {
+    position: absolute;
+    background: #080F0FDF;
+    border-radius: 5px;
+    border: 1px solid #EFF6E0;
+    color: #EFF6E0;
+    font-size: 17;
+    text-align: center;
+    width: auto;
+    padding: 3 20px;
+    height: auto;
+    top: 100px; 
+    left: 100px;
+    display: none;
+    transform: translate(-50%, -100%);
+}
+
+#info-panel-variance.success {
+    color: #35FF69;
+}
+
+#info-panel-variance.fail {
+    color: #FF1B1C;
 }

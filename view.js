@@ -8,6 +8,10 @@ let graphSVG = document.getElementById("graph-svg");
 let polygon = document.getElementById("polygon");
 let polygonStroke = document.getElementById("polygon-stroke");
 
+let infoPanel = document.getElementById("info-panel");
+let infoPanelCurrent = document.getElementById("info-panel-current");
+let infoPanelVariance = document.getElementById("info-panel-variance");
+
 let coordinates = document.getElementById("coordinates");
 let coordinatesSVG = document.getElementById("coordinates-svg");
 let verticalMain = document.getElementById("vertical").getElementsByClassName("main")[0];
@@ -19,13 +23,14 @@ graphSVG.namespaceURI = "http://www.w3.org/2000/svg";
 coordinatesSVG.namespaceURI = "http://www.w3.org/2000/svg";
 
 let polygonOffset = 0;
-let topPx = 16, bottomPx = 16, leftPx = 16;
+let topPx = 16, bottomPx = 16, leftPx = 16, rightPx = 16;
 
 let coordsAdditionalSize = 8;
 
 let step = 25,
     horizontalCoordsStep = 50,
-    currentHorizontalCoordsNum = 0;
+    currentHorizontalCoordsNum = 0,
+    pageOffsetX = 0;
 
 let verticalFrom = 0,
     verticalTo = 1000,
@@ -74,10 +79,10 @@ function checkHorizontalCoordinates() {
 }
 
 function resetDims() {
-    graphSVG.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    graphSVG.style.width = width;
-    coordinatesSVG.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    coordinatesSVG.style.width = width;
+    graphSVG.setAttribute("viewBox", `0 0 ${width + rightPx + leftPx} ${height}`);
+    graphSVG.style.width = width + rightPx + leftPx;
+    coordinatesSVG.setAttribute("viewBox", `0 0 ${width + rightPx + leftPx} ${height}`);
+    coordinatesSVG.style.width = width + rightPx + leftPx;
     checkHorizontalCoordinates();
 }
 
@@ -137,22 +142,63 @@ function init() {
     horizontalMain.setAttribute("y1", height - 16);
     horizontalMain.setAttribute("y2", height - 16);
     resetDims();
-}
-let x = 0;
-function* adder() {
-    while (true){
-        yield addPoint(x, Math.random() * (height - topPx - bottomPx)); 
-        x+=step;
-    }
+
+    graphContainer.onmouseenter = function () {
+        infoPanel.style.display = "block";
+    };
+    graphContainer.onmouseleave = function () {
+        infoPanel.style.display = "none";
+    };
+    let lastIndex = -1;
+    let infoPanelHeight, infoPanelWidth;
+    graphContainer.onmousemove = function (event) {
+        let x = scrollSolver.scrollLeft + event.pageX - leftPx - polygonOffset;
+        let index = Math.floor(x / step);
+        if (index >= 0 && index < data.length && index != lastIndex) {
+            if (!infoPanelHeight)
+                infoPanelHeight = infoPanel.getBoundingClientRect().height;
+            infoPanelWidth = infoPanel.getBoundingClientRect().width;
+
+            lastIndex = index;
+            infoPanel.style.top = (scaledPoints[index][1] > infoPanelHeight) ? scaledPoints[index][1] : infoPanelHeight;
+            infoPanel.style.left = scaledPoints[index][0];
+
+            if (scaledPoints[index][0] - infoPanelWidth/2 < 0) {
+                infoPanel.style.left = infoPanelWidth / 2;
+            } else if (scaledPoints[index][0] + infoPanelWidth/2 > width + leftPx + rightPx) {
+                infoPanel.style.left = width + leftPx + rightPx - infoPanelWidth/2;
+            }
+
+            infoPanelCurrent.innerText = data[index].value;
+            if (index > 0) {
+                let res = data[index].value - data[index - 1].value;
+                if (res > 0) {
+                    infoPanelVariance.innerText = "+"+res;
+                    infoPanelVariance.className = "success";
+                } else if (res < 0) {
+                    infoPanelVariance.innerText = res;
+                    infoPanelVariance.className = "fail";
+                } else {
+                    infoPanelVariance.innerText = res;
+                    infoPanelVariance.className = "";
+                }
+            } else {
+                infoPanelVariance.innerText = "-";
+                infoPanelVariance.className = "";
+            }
+        } else {
+
+        }
+    };
 }
 
 window.onload = function() {
     init();
 
-    for (let i = 0; i < 200; i++){ 
+    for (let i = 0; i < 26; i++){ 
         data.push({
             order: i * step,
-            value: Math.random() * 1000
+            value: Math.floor(Math.random() * 1000)
         });
     }
 
