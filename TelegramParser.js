@@ -1,4 +1,14 @@
 /* jshint esversion: 6 */
 
-let private = require("private");
-let TelegramBot = require("node-telegram-bot-api");
+module.exports = {
+    getMembersNum: getMembersNum
+};
+
+const prv = require("./private");
+const TelegramBot = require("node-telegram-bot-api");
+
+const bot = new TelegramBot(prv.tkn, { polling: true });
+
+function getMembersNum() {
+    return bot.getChatMembersCount(prv.pathologyGroupID);
+}

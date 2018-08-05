@@ -1,7 +1,7 @@
 /* jshint esversion: 6 */
 
 let fs = require('fs');
-let TelegramParser = require('telegramParser');
+let TelegramParser = require('./TelegramParser');
 
 let width, height;
 let graphContainer = document.getElementById("graph-container");
@@ -122,7 +122,13 @@ function addArrays() {
     return res;
 }
 
-function addPoint(x, y) {
+function addToData({ value, order, date }) {
+    console.log(arguments, value);
+    data.push({ value: value, order: order, date: date });
+    console.log(data);
+}
+
+function addPoint(x, y, date) {
     scaledPoints.push([x+leftPx, height - bottomPx - y*verticalScale]);
     polygonStroke.setAttribute("points", scaledPoints.map(x=>`${Math.floor(x[0])},${Math.floor(x[1])}`).join(" "));
     polygon.setAttribute("points", (addArrays([[scaledPoints[0][0], height]], scaledPoints, [[scaledPoints[scaledPoints.length-1][0], height]])).map(x=>`${Math.floor(x[0])},${Math.floor(x[1])}`).join(" "));
@@ -156,7 +162,7 @@ function init() {
     graphContainer.onmousemove = function (event) {
         let x = scrollSolver.scrollLeft + event.pageX - leftPx - polygonOffset;
         let index = Math.floor(x / step);
-        if (index >= 0 && index < data.length && index != lastIndex) {
+        if (index >= 0 && index < scaledPoints.length && index != lastIndex) {
             if (!infoPanelHeight)
                 infoPanelHeight = infoPanel.getBoundingClientRect().height;
             infoPanelWidth = infoPanel.getBoundingClientRect().width;
@@ -194,15 +200,31 @@ function init() {
     };
 }
 
+function pushMembersNum(callBack) {
+    TelegramParser.getMembersNum().then((res) => {
+        addToData({
+            value: res,
+            order: (data.length ? data[data.length - 1].order + step : 0),
+            date: new Date()
+        });
+        callBack();
+    }, (err) => {
+        console.log(err);
+    });
+}
+
+function saveData(curr, order) {
+    fs.writeFileSync('./data.json', JSON.stringify(data));
+}
+
+function updateData() {
+    data = JSON.parse(fs.readFileSync('./data.json'));
+}
+
 window.onload = function() {
     init();
-
-    for (let i = 0; i < 26; i++){ 
-        data.push({
-            order: i * step,
-            value: Math.floor(Math.random() * 1000)
-        });
-    }
+    updateData();
+    // pushMembersNum(saveData);
 
     resetGraph();
 };
