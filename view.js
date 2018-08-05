@@ -1,5 +1,8 @@
 /* jshint esversion: 6 */
 
+let fs = require('fs');
+let TelegramParser = require('telegramParser');
+
 let width, height;
 let graphContainer = document.getElementById("graph-container");
 let graph = document.getElementById("graph");
@@ -29,8 +32,7 @@ let coordsAdditionalSize = 8;
 
 let step = 25,
     horizontalCoordsStep = 50,
-    currentHorizontalCoordsNum = 0,
-    pageOffsetX = 0;
+    currentHorizontalCoordsNum = 0;
 
 let verticalFrom = 0,
     verticalTo = 1000,
