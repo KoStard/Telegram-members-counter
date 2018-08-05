@@ -32,6 +32,9 @@ let verticalFrom = 0,
     verticalScale,
     verticalCoordsStepNum = 10;
 
+let scaledPoints = [];
+let data = [];
+
 function createVerticalCoordinates() {
     for (let i = 0; i < verticalCoordsStepNum; i++) {
         let line = document.createElementNS("http://www.w3.org/2000/svg","line");
@@ -86,7 +89,21 @@ function resetVerticalScale() {
     verticalScale = Math.abs((height - topPx - bottomPx) / (verticalTo - verticalFrom));
 }
 
-let scaledPoints = [];
+function resetGraph() {
+    console.log("reseting graph");
+    scaledPoints = [];
+    for (let element of data) {
+        addPoint(element.order, element.value);
+    }
+}
+
+function resize(from, to) {
+    verticalFrom = from;
+    verticalTo = to;
+    resetVerticalScale();
+    resetGraph();
+}
+
 
 function addArrays() {
     res = [];
@@ -103,7 +120,7 @@ function addPoint(x, y) {
     polygonStroke.setAttribute("points", scaledPoints.map(x=>`${Math.floor(x[0])},${Math.floor(x[1])}`).join(" "));
     polygon.setAttribute("points", (addArrays([[scaledPoints[0][0], height]], scaledPoints, [[scaledPoints[scaledPoints.length-1][0], height]])).map(x=>`${Math.floor(x[0])},${Math.floor(x[1])}`).join(" "));
     let polW = polygon.getBoundingClientRect().width;
-    if (polW + polygonOffset > width) {
+    if (polW + polygonOffset > width || polW + polygonOffset < width - graphContainer.getBoundingClientRect().width) { // Enabling to shrink too
         width = polW + polygonOffset;
         resetDims();
         resetScrolls();
@@ -128,14 +145,16 @@ function* adder() {
         x+=step;
     }
 }
-let intrvl;
-
-function stop() {
-    clearInterval(intrvl);
-}
 
 window.onload = function() {
     init();
-    let dd = adder();
-    intrvl = setInterval(function(){dd.next();}, 300);
+
+    for (let i = 0; i < 200; i++){ 
+        data.push({
+            order: i * step,
+            value: Math.random() * 1000
+        });
+    }
+
+    resetGraph();
 };
