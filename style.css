@@ -46,10 +46,10 @@ html, body {
 #graph-container {
     position: absolute;
     overflow: hidden;
-    bottom: 64px;
-    left: 128px;
-    right: 128px;
-    top: 64px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: 0;
 }
 
 #scroll-solver {
@@ -64,7 +64,7 @@ html, body {
 
 #graph {
     position: absolute;
-    top: 32px;
+    /* bottom: 32px; */
 }
 
 #polygon {
@@ -76,4 +76,12 @@ html, body {
     stroke-width: 3px;
     stroke-linejoin: round;
     fill: none;
+}
+
+#coordinates {
+    position: absolute;
+}
+
+.coordinates {
+    stroke: white;
 }
