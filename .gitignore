@@ -1,3 +1,5 @@
 node_modules/*
 private.js
+private.json
 data.json
+temp.json

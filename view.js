@@ -1,7 +1,7 @@
 /* jshint esversion: 6 */
 
-let fs = require('fs');
-let TelegramParser = require('./TelegramParser');
+const fs = require('fs');
+const { ipcRenderer } = require('electron');
 
 let width, height;
 let graphContainer = document.getElementById("graph-container");
@@ -22,11 +22,18 @@ let verticalAdditional = document.getElementById("vertical").getElementsByClassN
 let horizontalMain = document.getElementById("horizontal").getElementsByClassName("main")[0];
 let horizontalAdditional = document.getElementById("horizontal").getElementsByClassName("additional")[0];
 
+let panelName = document.getElementById("panel-name");
+let panelCurrent = document.getElementById("panel-current");
+let panelBotName = document.getElementById("panel-bot-name");
+
 graphSVG.namespaceURI = "http://www.w3.org/2000/svg";
 coordinatesSVG.namespaceURI = "http://www.w3.org/2000/svg";
 
 let polygonOffset = 0;
-let topPx = 16, bottomPx = 16, leftPx = 16, rightPx = 16;
+let topPx = 16,
+    bottomPx = 16,
+    leftPx = 16,
+    rightPx = 16;
 
 let coordsAdditionalSize = 8;
 
@@ -41,10 +48,104 @@ let verticalFrom = 0,
 
 let scaledPoints = [];
 let data = [];
+let current = {};
+
+
+// Telegram bot part
+const TelegramBot = require("node-telegram-bot-api");
+let privateDataRaw = fs.readFileSync("private.json");
+if (!privateDataRaw.length)
+    privateDataRaw = '{}';
+let privateData = JSON.parse(privateDataRaw);
+
+function savePrivateData() { fs.writeFileSync('private.json', JSON.stringify(privateData)); }
+
+let botsData = [];
+function loadBotsFromPrivateData() {
+    for (let username of Object.keys(privateData.bots)) {
+        botsData[username] = {
+            bot: new TelegramBot(privateData.bots[username].tkn, {
+                polling: true
+            }),
+            username: username
+        };
+    }
+    if (privateData.last)
+    current = {
+        botsData: botsData[privateData.last.bot],
+        target: privateData.last.target
+    };
+}
+
+function addBot(tkn, callBack) {
+    if (!privateData.bots) privateData.bots = [];
+    let bot = new TelegramBot(tkn, {
+        polling: true
+    });
+    bot.getMe().then((user) => {
+        botsData.push({
+            bot: bot,
+            username: user.username
+        });
+        privateData.bots.push({ tkn: tkn, username: user.username });
+        if (callBack) callBack();
+    },
+        (err) => { console.log(err); });
+    bot.getUpdates();
+    console.log(privateData);
+}
+
+// Telegram bot logic
+function updateCurrent() {
+    current.botsData.bot.getChatMembersCount(privateData.targets[current.target].id).then((res) => {
+        addToData({
+            value: res,
+            order: (data[current.botsData.username][current.target].length ? data[current.botsData.username][current.target][data[current.botsData.username][current.target].length - 1].order + step : 0),
+            date: new Date()
+        });
+        resetGraph();
+        saveData();
+    }, (err) => {
+        console.log(err);
+    });
+}
+
+function updateAll() {
+    for (let botData of botsData) {
+        for (let target of privateData.bots[botData.username].targets) {
+            current.botsData.bot.getChatMembersCount(privateData.targets[current.target].id).then((res) => {
+                addToData({
+                    value: res,
+                    order: (data[current.botsData.username][current.target].length ? data[current.botsData.username][current.target][data[current.botsData.username][current.target].length - 1].order + step : 0),
+                    date: new Date()
+                });
+            }, (err) => {
+                console.log(err);
+            });
+        }
+    }
+    resetGraph();
+    saveData();
+}
+
+function updatePanel() {
+    current.botsData.bot.getMe().then((user) => {
+        panelBotName.innerText = user.first_name;
+    }, (err) => {
+        console.log(err);
+    });
+    panelCurrent.innerText = data[current.botsData.username][current.target][data[current.botsData.username][current.target].length - 1].value;
+    current.botsData.bot.getChat(privateData.targets[current.target].id).then((chat) => {
+        panelName.innerText = chat.title;
+    },
+    (err) => { 
+        console.log(err);
+    });
+}
 
 function createVerticalCoordinates() {
     for (let i = 0; i < verticalCoordsStepNum; i++) {
-        let line = document.createElementNS("http://www.w3.org/2000/svg","line");
+        let line = document.createElementNS("http://www.w3.org/2000/svg", "line");
         line.setAttribute("class", "coordinates");
         line.setAttribute("x1", leftPx - coordsAdditionalSize / 2);
         line.setAttribute("x2", leftPx + coordsAdditionalSize / 2);
@@ -55,7 +156,7 @@ function createVerticalCoordinates() {
 }
 
 function createHorizontalCoordinates() {
-    for (let i = 0; i < Math.floor(width / horizontalCoordsStep); i++){
+    for (let i = 0; i < Math.floor(width / horizontalCoordsStep); i++) {
         let line = document.createElementNS("http://www.w3.org/2000/svg", "line");
         line.setAttribute("class", "coordinates");
         line.setAttribute("y1", height - bottomPx - coordsAdditionalSize / 2);
@@ -88,7 +189,7 @@ function resetDims() {
     checkHorizontalCoordinates();
 }
 
-function resetScrolls(){
+function resetScrolls() {
     scrollSolver.scrollTo(width, 0);
 }
 
@@ -99,7 +200,7 @@ function resetVerticalScale() {
 function resetGraph() {
     console.log("reseting graph");
     scaledPoints = [];
-    for (let element of data) {
+    for (let element of data[current.botsData.username][current.target]) {
         addPoint(element.order, element.value);
     }
 }
@@ -111,7 +212,6 @@ function resize(from, to) {
     resetGraph();
 }
 
-
 function addArrays() {
     res = [];
     for (let arg of arguments) {
@@ -122,22 +222,42 @@ function addArrays() {
     return res;
 }
 
-function addToData({ value, order, date }) {
-    console.log(arguments, value);
-    data.push({ value: value, order: order, date: date });
-    console.log(data);
+function addToData({value,order,date}) {
+    data[current.botsData.username][current.target].push({
+        value: value,
+        order: order,
+        date: date
+    });
 }
 
-function addPoint(x, y, date) {
-    scaledPoints.push([x+leftPx, height - bottomPx - y*verticalScale]);
-    polygonStroke.setAttribute("points", scaledPoints.map(x=>`${Math.floor(x[0])},${Math.floor(x[1])}`).join(" "));
-    polygon.setAttribute("points", (addArrays([[scaledPoints[0][0], height]], scaledPoints, [[scaledPoints[scaledPoints.length-1][0], height]])).map(x=>`${Math.floor(x[0])},${Math.floor(x[1])}`).join(" "));
+function addPoint(x, y) {
+    scaledPoints.push([x + leftPx, height - bottomPx - y * verticalScale]);
+    polygonStroke.setAttribute("points", scaledPoints.map(x => `${Math.floor(x[0])},${Math.floor(x[1])}`).join(" "));
+    polygon.setAttribute("points", (addArrays([
+        [scaledPoints[0][0], height]
+    ], scaledPoints, [
+        [scaledPoints[scaledPoints.length - 1][0], height]
+    ])).map(x => `${Math.floor(x[0])},${Math.floor(x[1])}`).join(" "));
     let polW = polygon.getBoundingClientRect().width;
     if (polW + polygonOffset > width || polW + polygonOffset < width - graphContainer.getBoundingClientRect().width) { // Enabling to shrink too
         width = polW + polygonOffset;
         resetDims();
         resetScrolls();
     }
+}
+
+function switchToBot(username) {
+    if (username == current.botsData.username) return;
+    current.botsData = botsData[username];
+    switchToTarget(privateData.bots[username].targets[0], true);
+    resetGraph();
+}
+
+function switchToTarget(username, isStep=false) {
+    if (current.target == username) return;
+    current.target = username;
+    if (!isStep)
+        resetGraph();
 }
 
 function init() {
@@ -171,17 +291,22 @@ function init() {
             infoPanel.style.top = (scaledPoints[index][1] > infoPanelHeight) ? scaledPoints[index][1] : infoPanelHeight;
             infoPanel.style.left = scaledPoints[index][0];
 
-            if (scaledPoints[index][0] - infoPanelWidth/2 < 0) {
+            let graphContainerWidth = graphContainer.getBoundingClientRect().width;
+            if (scaledPoints[index][0] - infoPanelWidth / 2 < 0) {
                 infoPanel.style.left = infoPanelWidth / 2;
-            } else if (scaledPoints[index][0] + infoPanelWidth/2 > width + leftPx + rightPx) {
-                infoPanel.style.left = width + leftPx + rightPx - infoPanelWidth/2;
+            } else if (graphContainerWidth > width) {
+                if (scaledPoints[index][0] + infoPanelWidth / 2 > graphContainerWidth) {
+                    infoPanel.style.left = graphContainerWidth - infoPanelWidth / 2;
+                }
+            } else if (scaledPoints[index][0] + infoPanelWidth / 2 > width + leftPx + rightPx) {
+                infoPanel.style.left = width + leftPx + rightPx - infoPanelWidth / 2;
             }
 
-            infoPanelCurrent.innerText = data[index].value;
+            infoPanelCurrent.innerText = data[current.botsData.username][current.target][index].value;
             if (index > 0) {
-                let res = data[index].value - data[index - 1].value;
+                let res = data[current.botsData.username][current.target][index].value - data[current.botsData.username][current.target][index - 1].value;
                 if (res > 0) {
-                    infoPanelVariance.innerText = "+"+res;
+                    infoPanelVariance.innerText = "+" + res;
                     infoPanelVariance.className = "success";
                 } else if (res < 0) {
                     infoPanelVariance.innerText = res;
@@ -198,33 +323,37 @@ function init() {
 
         }
     };
-}
-
-function pushMembersNum(callBack) {
-    TelegramParser.getMembersNum().then((res) => {
-        addToData({
-            value: res,
-            order: (data.length ? data[data.length - 1].order + step : 0),
-            date: new Date()
-        });
-        callBack();
-    }, (err) => {
-        console.log(err);
+    loadBotsFromPrivateData();
+    updateData();
+    resetGraph();
+    updatePanel();
+    ipcRenderer.send("privateData", privateData, privateData.bots[privateData.last.bot].targets);
+    ipcRenderer.on('switch', (_, content) => {
+        if (content.type == 'bot') {
+            switchToBot(content.username);
+        } else if (content.type == 'target') {
+            switchToTarget(content.username);
+        }
+    });
+    ipcRenderer.on('updateCurrent', () => {
+        updateCurrent();
+    });
+    ipcRenderer.on('updateAll', () => {
+        updateAll();
     });
 }
 
 function saveData(curr, order) {
     fs.writeFileSync('./data.json', JSON.stringify(data));
+    privateData.last.bot = current.botsData.username;
+    privateData.last.target = current.target;
+    fs.writeFileSync('./private.json', JSON.stringify(privateData));
 }
 
 function updateData() {
     data = JSON.parse(fs.readFileSync('./data.json'));
 }
 
-window.onload = function() {
+window.onload = function () {
     init();
-    updateData();
-    // pushMembersNum(saveData);
-
-    resetGraph();
 };
