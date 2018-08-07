@@ -375,8 +375,9 @@ function switchToBot(username) {
     current.botsData = botsData[username];
     switchToTarget(privateData.bots[username].targets[0], true);
     ipcRenderer.send("privateData", privateData, privateData.bots[current.botsData.username].targets);
-    saveData();
+    updatePanel();
     resetGraph();
+    saveData();
 }
 
 function switchToTarget(username, isStep=false) {
@@ -384,6 +385,7 @@ function switchToTarget(username, isStep=false) {
     current.target = username;
     if (!isStep) {
         resetGraph();
+        updatePanel();
         saveData();
     }
 }
@@ -402,54 +404,59 @@ function init() {
     // graphContainer.onmouseenter = function () {
     //     infoPanel.style.display = "block";
     // };
+    infoPanel.style.display = "none";
+    let lastIndex = -1;
     graphContainer.onmouseleave = function () {
         infoPanel.style.display = "none";
+        lastIndex = -1;
     };
-    let lastIndex = -1;
     let infoPanelHeight, infoPanelWidth;
     graphContainer.onmousemove = function (event) {
         let x = scrollSolver.scrollLeft + event.pageX - leftPx - polygonOffset;
-        let index = Math.floor(x / step);
-        if (index >= 0 && index < scaledPoints.length && index != lastIndex) {
-            if (infoPanel.style.display == "none") infoPanel.style.display = "block";
-            if (!infoPanelHeight)
-                infoPanelHeight = infoPanel.getBoundingClientRect().height;
-            infoPanelWidth = infoPanel.getBoundingClientRect().width;
+        let index = Math.round(x / step);
+        if (index >= 0 && index < scaledPoints.length) {
+            if (index != lastIndex) {
+                if (infoPanel.style.display == "none") infoPanel.style.display = "block";
+                if (!infoPanelHeight)
+                    infoPanelHeight = infoPanel.getBoundingClientRect().height;
+                infoPanelWidth = infoPanel.getBoundingClientRect().width;
 
-            lastIndex = index;
-            infoPanel.style.top = (scaledPoints[index][1] > infoPanelHeight) ? scaledPoints[index][1] : infoPanelHeight;
-            infoPanel.style.left = scaledPoints[index][0];
+                lastIndex = index;
+                infoPanel.style.top = (scaledPoints[index][1] > infoPanelHeight) ? scaledPoints[index][1] : infoPanelHeight;
+                infoPanel.style.left = scaledPoints[index][0];
 
-            let graphContainerWidth = graphContainer.getBoundingClientRect().width;
-            if (scaledPoints[index][0] - infoPanelWidth / 2 < 0) {
-                infoPanel.style.left = infoPanelWidth / 2;
-            } else if (graphContainerWidth > width) {
-                if (scaledPoints[index][0] + infoPanelWidth / 2 > graphContainerWidth) {
-                    infoPanel.style.left = graphContainerWidth - infoPanelWidth / 2;
+                let graphContainerWidth = graphContainer.getBoundingClientRect().width;
+                if (scaledPoints[index][0] - infoPanelWidth / 2 < 0) {
+                    infoPanel.style.left = infoPanelWidth / 2;
+                } else if (graphContainerWidth > width) {
+                    if (scaledPoints[index][0] + infoPanelWidth / 2 > graphContainerWidth) {
+                        infoPanel.style.left = graphContainerWidth - infoPanelWidth / 2;
+                    }
+                } else if (scaledPoints[index][0] + infoPanelWidth / 2 > width + leftPx + rightPx) {
+                    infoPanel.style.left = width + leftPx + rightPx - infoPanelWidth / 2;
                 }
-            } else if (scaledPoints[index][0] + infoPanelWidth / 2 > width + leftPx + rightPx) {
-                infoPanel.style.left = width + leftPx + rightPx - infoPanelWidth / 2;
-            }
 
-            infoPanelCurrent.innerText = data[current.target][index].value;
-            if (index > 0) {
-                let res = data[current.target][index].value - data[current.target][index - 1].value;
-                if (res > 0) {
-                    infoPanelVariance.innerText = "+" + res;
-                    infoPanelVariance.className = "success";
-                } else if (res < 0) {
-                    infoPanelVariance.innerText = res;
-                    infoPanelVariance.className = "fail";
+                infoPanelCurrent.innerText = data[current.target][index].value;
+                if (index > 0) {
+                    let res = data[current.target][index].value - data[current.target][index - 1].value;
+                    if (res > 0) {
+                        infoPanelVariance.innerText = "+" + res;
+                        infoPanelVariance.className = "success";
+                    } else if (res < 0) {
+                        infoPanelVariance.innerText = res;
+                        infoPanelVariance.className = "fail";
+                    } else {
+                        infoPanelVariance.innerText = "-";
+                        infoPanelVariance.className = "";
+                    }
                 } else {
-                    infoPanelVariance.innerText = res;
+                    infoPanelVariance.innerText = "-";
                     infoPanelVariance.className = "";
                 }
-            } else {
-                infoPanelVariance.innerText = "-";
-                infoPanelVariance.className = "";
             }
         } else {
-
+            infoPanel.style.display = "none";
+            lastIndex = -1;
         }
     };
     loadBotsFromPrivateData();
