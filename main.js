@@ -42,6 +42,8 @@ ipcMain.on("privateData", (event, privateData, targets) => {
             }
         });
     template[template.length - 1].submenu[0].submenu.push({
+                type: 'separator'
+            }, {
         label: "Add Bot",
         click: () => {
             win.webContents.send("addBot");
@@ -58,6 +60,8 @@ ipcMain.on("privateData", (event, privateData, targets) => {
             }
         });
     template[template.length - 1].submenu[1].submenu.push({
+                type: 'separator'
+            }, {
         label: "Add Target",
         click: () => {
             win.webContents.send("addTarget");
