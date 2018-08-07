@@ -326,6 +326,7 @@ function resetGraph() {
     for (let element of data[current.target]) {
         addPoint(element.order, element.value);
     }
+    updatePanel();
 }
 
 function resize(from, to) {
@@ -378,7 +379,6 @@ function switchToBot(username) {
     current.botsData = botsData[username];
     switchToTarget(privateData.bots[username].targets[0], true);
     ipcRenderer.send("privateData", privateData, privateData.bots[current.botsData.username].targets);
-    updatePanel();
     resetGraph();
     saveData();
 }
@@ -388,7 +388,6 @@ function switchToTarget(username, isStep=false) {
     current.target = username;
     if (!isStep) {
         resetGraph();
-        updatePanel();
         saveData();
     }
 }
@@ -465,7 +464,6 @@ function init() {
     loadBotsFromPrivateData();
     updateData();
     resetGraph();
-    updatePanel();
     ipcRenderer.send("privateData", privateData, privateData.bots[privateData.last.bot].targets);
     ipcRenderer.on('switch', (_, content) => {
         if (content.type == 'bot') {
