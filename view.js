@@ -243,22 +243,11 @@ function updateAll() {
 }
 
 function updatePanel() {
-    // current.botsData.bot.getMe().then((user) => {
-    //     panelBotName.innerText = user.first_name;
-    // }, (err) => {
-    //     console.log(err);
-    //     });
     if (!current.botsData || !current.botsData.username) return;
     panelBotName.innerText = privateData.bots[current.botsData.username].first_name || current.botsData.username;
-    if (!current.target) { console.log("no target"); return; };
+    if (!current.target) { console.log("no target"); return; }
     panelCurrent.innerText = data[current.target].length ? data[current.target][data[current.target].length - 1].value : 0;
     panelName.innerText = privateData.targets[current.target].title;
-    // current.botsData.bot.getChat(privateData.targets[current.target].id).then((chat) => {
-    //     panelName.innerText = chat.title;
-    // },
-    // (err) => { 
-    //     console.log(err);
-    // });
 }
 
 function createVerticalCoordinates() {
@@ -327,6 +316,63 @@ function resetGraph() {
         addPoint(element.order, element.value);
     }
     updatePanel();
+}
+
+function resizer() {
+    new popup.PopupInputPanelBigCentral({
+        headerText: "Resize [from -> to]",
+        inputNames: ['from', 'to'],
+        buttons: [
+            createButton({
+                value: "Done",
+                onclick(panel) {
+                    let from, to;
+                    if (!current.target) {
+                        from = verticalFrom;
+                        to = verticalTo;
+                    } else
+                    try {
+                        if (panel.inputs[0].value == "min") {
+                            if (data[current.target].length) {
+                                let min = data[current.target][0].value;
+                                for (let el of data[current.target]) {
+                                    if (el.value < min) min = el.value;
+                                }
+                                from = Math.floor(min);
+                            } else {
+                                from = verticalFrom;
+                            }
+                        }
+                        else from = parseInt(panel.inputs[0].value);
+                        if (panel.inputs[1].value == "max") {
+                            if (data[current.target].length) {
+                                let max = data[current.target][0].value;
+                                for (let el of data[current.target]) {
+                                    if (el.value > max) max = el.value;
+                                }
+                                to = Math.floor(max+0.99);
+                            } else {
+                                to = verticalTo;
+                            }
+                        } else to = parseInt(panel.inputs[1].value);
+                    } catch (err) {
+                        console.error(err);
+                        return;
+                    }
+                    resize(from, to);
+                    panel.close();
+                }
+            }),
+            createButton({
+                value: "Cancel",
+                onclick(panel) {
+                    panel.close();
+                }
+            })
+        ],
+        owner: container,
+        buffered: false
+    })
 }
 
 function resize(from, to) {
@@ -483,6 +529,9 @@ function init() {
     });
     ipcRenderer.on('addTarget', () => {
         targetAdder();
+    });
+    ipcRenderer.on('resize', () => {
+        resizer();
     });
 }
 

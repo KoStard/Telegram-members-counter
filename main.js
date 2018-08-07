@@ -29,10 +29,11 @@ app.on('activate', () => {
 });
 
 ipcMain.on("privateData", (event, privateData, targets) => {
-    template[template.length - 1].submenu[0].submenu = [];
-    template[template.length - 1].submenu[1].submenu = [];
+    // Accessing Switch
+    template[template.length - 3].submenu[0].submenu = [];
+    template[template.length - 3].submenu[1].submenu = [];
     for (let el of Object.keys(privateData.bots))
-        template[template.length - 1].submenu[0].submenu.push({
+        template[template.length - 3].submenu[0].submenu.push({
             label: el,
             click: () => { 
                 win.webContents.send("switch", {
@@ -41,7 +42,7 @@ ipcMain.on("privateData", (event, privateData, targets) => {
                 });
             }
         });
-    template[template.length - 1].submenu[0].submenu.push({
+    template[template.length - 3].submenu[0].submenu.push({
                 type: 'separator'
             }, {
         label: "Add Bot",
@@ -50,7 +51,7 @@ ipcMain.on("privateData", (event, privateData, targets) => {
         }
     });
     for (let el of targets)
-        template[template.length - 1].submenu[1].submenu.push({
+        template[template.length - 3].submenu[1].submenu.push({
             label: el,
             click: () => {
                 win.webContents.send("switch", {
@@ -59,7 +60,7 @@ ipcMain.on("privateData", (event, privateData, targets) => {
                 });
             }
         });
-    template[template.length - 1].submenu[1].submenu.push({
+    template[template.length - 3].submenu[1].submenu.push({
                 type: 'separator'
             }, {
         label: "Add Target",
@@ -141,15 +142,6 @@ const template = [{
         role: 'close'
     }
     ]
-},
-{
-    role: 'help',
-    submenu: [{
-        label: 'Learn More',
-        click() {
-            require('electron').shell.openExternal('https://electronjs.org')
-        }
-    }]
 }, {
     label: 'Update',
     submenu: [{
@@ -176,6 +168,24 @@ const template = [{
             submenu: []
         }
     ]
+    }, {
+    label: 'Tools',
+    submenu: [
+        {
+            label: 'Resize',
+            click() {
+                win.webContents.send("resize");
+            }
+        }
+    ]
+    }, {
+        role: 'help',
+        submenu: [{
+            label: 'Learn More',
+            click() {
+                require('electron').shell.openExternal('https://electronjs.org')
+            }
+        }]
     }
 ];
 

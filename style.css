@@ -99,7 +99,7 @@ html, body {
 
 #info-panel {
     position: absolute;
-    background: #080F0FDF;
+    background: rgba(8, 15, 15, 0.6);
     border-radius: 5px;
     border: 1px solid #EFF6E0;
     color: #EFF6E0;
