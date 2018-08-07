@@ -221,22 +221,25 @@ function updateCurrent() {
 }
 
 function updateAll() {
-    for (let botData of botsData) {
+    for (let key of Object.keys(botsData)) {
+        let botData = botsData[key];
         for (let target of privateData.bots[botData.username].targets) {
-            botsData.bot.getChatMembersCount(privateData.targets[target].id).then((res) => {
+            botData.bot.getChatMembersCount(privateData.targets[target].id).then((res) => {
                 addToData({
                     value: res,
                     order: (data[target].length ? data[target][data[target].length - 1].order + step : 0),
                     date: new Date(),
                     target: target
                 });
+                if (target == current.target) {
+                    resetGraph();
+                }
+                saveData(); // Not efficient, this is saving every time
             }, (err) => {
                 console.log(err);
             });
         }
     }
-    resetGraph();
-    saveData();
 }
 
 function updatePanel() {
