@@ -41,6 +41,12 @@ ipcMain.on("privateData", (event, privateData, targets) => {
                 });
             }
         });
+    template[template.length - 1].submenu[0].submenu.push({
+        label: "Add Bot",
+        click: () => {
+            win.webContents.send("addBot");
+        }
+    });
     for (let el of targets)
         template[template.length - 1].submenu[1].submenu.push({
             label: el,
@@ -51,6 +57,12 @@ ipcMain.on("privateData", (event, privateData, targets) => {
                 });
             }
         });
+    template[template.length - 1].submenu[1].submenu.push({
+        label: "Add Target",
+        click: () => {
+            win.webContents.send("addTarget");
+        }
+    });
     Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 });
 

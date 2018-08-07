@@ -80,6 +80,13 @@ html, body {
     stroke-width: 3px;
     stroke-linejoin: round;
     fill: none;
+    marker-start: url(#marker-point);
+    marker-mid: url(#marker-point);
+    marker-end: url(#marker-point);
+}
+
+#marker-point {
+    fill: rgba(119, 255, 244, 0.75);
 }
 
 #coordinates {

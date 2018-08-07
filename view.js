@@ -4,6 +4,7 @@ const fs = require('fs');
 const { ipcRenderer } = require('electron');
 
 let width, height;
+let container = document.getElementById("container");
 let graphContainer = document.getElementById("graph-container");
 let graph = document.getElementById("graph");
 let scrollSolver = document.getElementById("scroll-solver");
@@ -25,6 +26,8 @@ let horizontalAdditional = document.getElementById("horizontal").getElementsByCl
 let panelName = document.getElementById("panel-name");
 let panelCurrent = document.getElementById("panel-current");
 let panelBotName = document.getElementById("panel-bot-name");
+
+const popup = require("./popup");
 
 graphSVG.namespaceURI = "http://www.w3.org/2000/svg";
 coordinatesSVG.namespaceURI = "http://www.w3.org/2000/svg";
@@ -50,6 +53,26 @@ let scaledPoints = [];
 let data = [];
 let current = {};
 
+function createButton({
+    value,
+    buttonClass,
+    buttonID,
+    onclick,
+    owner
+}) {
+    if (!value) {
+        return false;
+    }
+    let newButton = document.createElement('button');
+    newButton.innerText = value;
+    if (buttonClass) newButton.className = buttonClass;
+    if (buttonID) newButton.id = buttonID;
+    if (onclick) newButton.onclick = onclick;
+    if (owner) {
+        owner.appendChild(newButton);
+    }
+    return newButton;
+}
 
 // Telegram bot part
 const TelegramBot = require("node-telegram-bot-api");
@@ -65,7 +88,7 @@ function loadBotsFromPrivateData() {
     for (let username of Object.keys(privateData.bots)) {
         botsData[username] = {
             bot: new TelegramBot(privateData.bots[username].tkn, {
-                polling: true
+                polling: false
             }),
             username: username
         };
@@ -77,30 +100,117 @@ function loadBotsFromPrivateData() {
     };
 }
 
-function addBot(tkn, callBack) {
-    if (!privateData.bots) privateData.bots = [];
-    let bot = new TelegramBot(tkn, {
-        polling: true
+function botAdder() {
+    new popup.PopupInputPanelBigCentral({
+        headerText: 'Bot Token',
+        inputNames: ['token'],
+        buttons: [
+            createButton({
+                value: "Done",
+                onclick(panel) {
+                    let tkn = panel.inputs[0].value;
+                    for (let username of Object.keys(privateData.bots)) {
+                        if (privateData.bots[username].tkn == tkn)
+                            return false;
+                    }
+                    let bot;
+                    try {
+                        bot = new TelegramBot(tkn, { polling: false });
+                    } catch (err) {
+                        console.log("invalid token");
+                        return false;
+                    }
+                    bot.getMe().then(
+                        (user) => {
+                            privateData.bots[user.username] = {
+                                tkn: tkn,
+                                targets: [],
+                                first_name: user.first_name
+                            };
+                            botsData[user.username] = {
+                                bot: bot,
+                                username: user.username
+                            };
+                            ipcRenderer.send("privateData", privateData, privateData.bots[current.botsData.username].targets);
+                            saveData();
+                            panel.close();
+                        }, (err) => {
+                            console.log(err);
+                        }
+                    );
+                }
+            }),
+            createButton({
+                value: "Cancel",
+                onclick(panel) {
+                    panel.close();
+                }
+            })
+        ],
+        owner: container,
+        width: 450,
+        buffered: false
     });
-    bot.getMe().then((user) => {
-        botsData.push({
-            bot: bot,
-            username: user.username
-        });
-        privateData.bots.push({ tkn: tkn, username: user.username });
-        if (callBack) callBack();
-    },
-        (err) => { console.log(err); });
-    bot.getUpdates();
-    console.log(privateData);
+}
+
+function targetAdder() {
+    new popup.PopupInputPanelBigCentral({
+        headerText: 'Channel/Group ID',
+        inputNames: ['ID'],
+        buttons: [
+            createButton({
+                value: "Done",
+                onclick(panel) {
+                    let id = panel.inputs[0].value;
+                    for (let username of Object.keys(privateData.targets)) {
+                        if (privateData.targets[username].id == id)
+                            return false;
+                    }
+                    let bot = current.botsData.bot;
+                    try {
+                        bot.getChat(id).then((chat) => { 
+                            let key = chat.username || chat.title || chat.first_name || chat.id;
+                            console.log("key is "+key);
+                            privateData.targets[key] = {
+                                title: chat.title,
+                                id: id
+                            };
+                            privateData.bots[current.botsData.username].targets.push(key);
+                            ipcRenderer.send("privateData", privateData, privateData.bots[current.botsData.username].targets);
+                            saveData();
+                            if (!current.target) {
+                                current.target = key;
+                                resetGraph();
+                            }
+                            data[key] = [];
+                            panel.close();
+                        }, (err) => { console.error(err); });
+                    } catch (err) {
+                        console.log("invalid token");
+                        return false;
+                    }
+                }
+            }),
+            createButton({
+                value: "Cancel",
+                onclick(panel) {
+                    panel.close();
+                }
+            })
+        ],
+        owner: container,
+        width: 450,
+        buffered: false
+    });
 }
 
 // Telegram bot logic
 function updateCurrent() {
+    if (!current.target) return;
     current.botsData.bot.getChatMembersCount(privateData.targets[current.target].id).then((res) => {
         addToData({
             value: res,
-            order: (data[current.botsData.username][current.target].length ? data[current.botsData.username][current.target][data[current.botsData.username][current.target].length - 1].order + step : 0),
+            order: (data[current.target].length ? data[current.target][data[current.target].length - 1].order + step : 0),
             date: new Date()
         });
         resetGraph();
@@ -113,11 +223,12 @@ function updateCurrent() {
 function updateAll() {
     for (let botData of botsData) {
         for (let target of privateData.bots[botData.username].targets) {
-            current.botsData.bot.getChatMembersCount(privateData.targets[current.target].id).then((res) => {
+            botsData.bot.getChatMembersCount(privateData.targets[target].id).then((res) => {
                 addToData({
                     value: res,
-                    order: (data[current.botsData.username][current.target].length ? data[current.botsData.username][current.target][data[current.botsData.username][current.target].length - 1].order + step : 0),
-                    date: new Date()
+                    order: (data[target].length ? data[target][data[target].length - 1].order + step : 0),
+                    date: new Date(),
+                    target: target
                 });
             }, (err) => {
                 console.log(err);
@@ -129,18 +240,22 @@ function updateAll() {
 }
 
 function updatePanel() {
-    current.botsData.bot.getMe().then((user) => {
-        panelBotName.innerText = user.first_name;
-    }, (err) => {
-        console.log(err);
-    });
-    panelCurrent.innerText = data[current.botsData.username][current.target][data[current.botsData.username][current.target].length - 1].value;
-    current.botsData.bot.getChat(privateData.targets[current.target].id).then((chat) => {
-        panelName.innerText = chat.title;
-    },
-    (err) => { 
-        console.log(err);
-    });
+    // current.botsData.bot.getMe().then((user) => {
+    //     panelBotName.innerText = user.first_name;
+    // }, (err) => {
+    //     console.log(err);
+    //     });
+    if (!current.botsData || !current.botsData.username) return;
+    panelBotName.innerText = privateData.bots[current.botsData.username].first_name || current.botsData.username;
+    if (!current.target) { console.log("no target"); return; };
+    panelCurrent.innerText = data[current.target].length ? data[current.target][data[current.target].length - 1].value : 0;
+    panelName.innerText = privateData.targets[current.target].title;
+    // current.botsData.bot.getChat(privateData.targets[current.target].id).then((chat) => {
+    //     panelName.innerText = chat.title;
+    // },
+    // (err) => { 
+    //     console.log(err);
+    // });
 }
 
 function createVerticalCoordinates() {
@@ -200,7 +315,12 @@ function resetVerticalScale() {
 function resetGraph() {
     console.log("reseting graph");
     scaledPoints = [];
-    for (let element of data[current.botsData.username][current.target]) {
+    if (!current.target) {
+        polygonStroke.setAttribute("points", "");
+        polygon.setAttribute("points", "");
+        return;
+    }
+    for (let element of data[current.target]) {
         addPoint(element.order, element.value);
     }
 }
@@ -222,8 +342,12 @@ function addArrays() {
     return res;
 }
 
-function addToData({value,order,date}) {
-    data[current.botsData.username][current.target].push({
+function addToData({ value, order, date, target }) {
+    if (!target) target = current.target;
+    if (!data[target]) {
+        data[target] = [];
+    }
+    data[target].push({
         value: value,
         order: order,
         date: date
@@ -250,14 +374,18 @@ function switchToBot(username) {
     if (username == current.botsData.username) return;
     current.botsData = botsData[username];
     switchToTarget(privateData.bots[username].targets[0], true);
+    ipcRenderer.send("privateData", privateData, privateData.bots[current.botsData.username].targets);
+    saveData();
     resetGraph();
 }
 
 function switchToTarget(username, isStep=false) {
     if (current.target == username) return;
     current.target = username;
-    if (!isStep)
+    if (!isStep) {
         resetGraph();
+        saveData();
+    }
 }
 
 function init() {
@@ -271,9 +399,9 @@ function init() {
     horizontalMain.setAttribute("y2", height - 16);
     resetDims();
 
-    graphContainer.onmouseenter = function () {
-        infoPanel.style.display = "block";
-    };
+    // graphContainer.onmouseenter = function () {
+    //     infoPanel.style.display = "block";
+    // };
     graphContainer.onmouseleave = function () {
         infoPanel.style.display = "none";
     };
@@ -283,6 +411,7 @@ function init() {
         let x = scrollSolver.scrollLeft + event.pageX - leftPx - polygonOffset;
         let index = Math.floor(x / step);
         if (index >= 0 && index < scaledPoints.length && index != lastIndex) {
+            if (infoPanel.style.display == "none") infoPanel.style.display = "block";
             if (!infoPanelHeight)
                 infoPanelHeight = infoPanel.getBoundingClientRect().height;
             infoPanelWidth = infoPanel.getBoundingClientRect().width;
@@ -302,9 +431,9 @@ function init() {
                 infoPanel.style.left = width + leftPx + rightPx - infoPanelWidth / 2;
             }
 
-            infoPanelCurrent.innerText = data[current.botsData.username][current.target][index].value;
+            infoPanelCurrent.innerText = data[current.target][index].value;
             if (index > 0) {
-                let res = data[current.botsData.username][current.target][index].value - data[current.botsData.username][current.target][index - 1].value;
+                let res = data[current.target][index].value - data[current.target][index - 1].value;
                 if (res > 0) {
                     infoPanelVariance.innerText = "+" + res;
                     infoPanelVariance.className = "success";
@@ -341,13 +470,39 @@ function init() {
     ipcRenderer.on('updateAll', () => {
         updateAll();
     });
+    ipcRenderer.on('addBot', () => {
+        botAdder();
+    });
+    ipcRenderer.on('addTarget', () => {
+        targetAdder();
+    });
 }
 
-function saveData(curr, order) {
+function saveData() {
     fs.writeFileSync('./data.json', JSON.stringify(data));
+    console.log(current);
     privateData.last.bot = current.botsData.username;
     privateData.last.target = current.target;
-    fs.writeFileSync('./private.json', JSON.stringify(privateData));
+    savePrivateData();
+}
+
+function test() {
+    // new popup.PopupInputPanelBigCentral({
+    //     headerText: 'test',
+    //     inputNames: ['some', 'thing'],
+    //     finishFunction: (arg) => { console.log(arg); },
+    //     buttons: [
+    //         createButton({
+    //             value: "Click me",
+    //             onclick: () => { console.log("clicked"); },
+    //         }),
+    //     ],
+    //     owner: container,
+    //     onclose: (arg) => { console.log("onclose"); },
+    //     buffered: false,
+    //     width: 500,
+    // });
+    current.botsData.bot.getUpdates(offset = 1).then((res) => { console.log(res); }, (err) => { console.log(err); });
 }
 
 function updateData() {
