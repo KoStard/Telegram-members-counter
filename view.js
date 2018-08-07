@@ -231,7 +231,7 @@ function addToData({value,order,date}) {
 }
 
 function addPoint(x, y) {
-    scaledPoints.push([x + leftPx, height - bottomPx - y * verticalScale]);
+    scaledPoints.push([x + leftPx, height - bottomPx - (y - verticalFrom)* verticalScale]);
     polygonStroke.setAttribute("points", scaledPoints.map(x => `${Math.floor(x[0])},${Math.floor(x[1])}`).join(" "));
     polygon.setAttribute("points", (addArrays([
         [scaledPoints[0][0], height]
