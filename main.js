@@ -161,11 +161,21 @@ const template = [{
     submenu: [
         {
             label: 'Bots',
-            submenu: []
+            submenu: [{
+                label: "Add Bot",
+                click: () => {
+                    win.webContents.send("addBot");
+                }
+            }]
         },
         {
             label: 'Targets',
-            submenu: []
+            submenu: [{
+                label: "Add Target",
+                click: () => {
+                    win.webContents.send("addTarget");
+                }
+            }]
         }
     ]
     }, {

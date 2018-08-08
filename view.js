@@ -76,10 +76,19 @@ function createButton({
 
 // Telegram bot part
 const TelegramBot = require("node-telegram-bot-api");
-let privateDataRaw = fs.readFileSync("private.json");
-if (!privateDataRaw.length)
-    privateDataRaw = '{}';
-let privateData = JSON.parse(privateDataRaw);
+let privateData;
+if (!fs.existsSync("private.json")) {
+    privateData = {
+        bots: "",
+        targets: "",
+        last: ""
+    };
+} else {
+    let privateDataRaw = fs.readFileSync("private.json");
+    if (!privateDataRaw.length)
+        privateDataRaw = '{}';
+    privateData = JSON.parse(privateDataRaw);
+}
 
 function savePrivateData() { fs.writeFileSync('private.json', JSON.stringify(privateData)); }
 
@@ -131,7 +140,7 @@ function botAdder() {
                                 bot: bot,
                                 username: user.username
                             };
-                            ipcRenderer.send("privateData", privateData, privateData.bots[current.botsData.username].targets);
+                            updateSwitchPanel();
                             saveData();
                             panel.close();
                         }, (err) => {
@@ -176,7 +185,7 @@ function targetAdder() {
                                 id: id
                             };
                             privateData.bots[current.botsData.username].targets.push(key);
-                            ipcRenderer.send("privateData", privateData, privateData.bots[current.botsData.username].targets);
+                            updateSwitchPanel();
                             saveData();
                             if (!current.target) {
                                 current.target = key;
@@ -424,7 +433,7 @@ function switchToBot(username) {
     if (username == current.botsData.username) return;
     current.botsData = botsData[username];
     switchToTarget(privateData.bots[username].targets[0], true);
-    ipcRenderer.send("privateData", privateData, privateData.bots[current.botsData.username].targets);
+    updateSwitchPanel();
     resetGraph();
     saveData();
 }
@@ -436,6 +445,11 @@ function switchToTarget(username, isStep=false) {
         resetGraph();
         saveData();
     }
+}
+
+function updateSwitchPanel() {
+    if (privateData.last && privateData.bots[privateData.last.bot])
+        ipcRenderer.send("privateData", privateData, privateData.bots[privateData.last.bot].targets);    
 }
 
 function init() {
@@ -510,7 +524,7 @@ function init() {
     loadBotsFromPrivateData();
     updateData();
     resetGraph();
-    ipcRenderer.send("privateData", privateData, privateData.bots[privateData.last.bot].targets);
+    updateSwitchPanel();
     ipcRenderer.on('switch', (_, content) => {
         if (content.type == 'bot') {
             switchToBot(content.username);
@@ -537,33 +551,18 @@ function init() {
 
 function saveData() {
     fs.writeFileSync('./data.json', JSON.stringify(data));
-    console.log(current);
-    privateData.last.bot = current.botsData.username;
-    privateData.last.target = current.target;
+    if (Object.keys(current).length) {
+        privateData.last.bot = current.botsData.username;
+        privateData.last.target = current.target;
+    }
     savePrivateData();
 }
 
-function test() {
-    // new popup.PopupInputPanelBigCentral({
-    //     headerText: 'test',
-    //     inputNames: ['some', 'thing'],
-    //     finishFunction: (arg) => { console.log(arg); },
-    //     buttons: [
-    //         createButton({
-    //             value: "Click me",
-    //             onclick: () => { console.log("clicked"); },
-    //         }),
-    //     ],
-    //     owner: container,
-    //     onclose: (arg) => { console.log("onclose"); },
-    //     buffered: false,
-    //     width: 500,
-    // });
-    current.botsData.bot.getUpdates(offset = 1).then((res) => { console.log(res); }, (err) => { console.log(err); });
-}
-
 function updateData() {
-    data = JSON.parse(fs.readFileSync('./data.json'));
+    if (!fs.existsSync("./data.json")) {
+        data = {};
+    } else
+        data = JSON.parse(fs.readFileSync('./data.json'));
 }
 
 window.onload = function () {
